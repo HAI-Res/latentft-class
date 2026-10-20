@@ -85,6 +85,8 @@ def main():
     ap.add_argument("--seeds", nargs="+", type=int, default=[0])
     ap.add_argument("--steps", type=int, default=35)
     ap.add_argument("--glides", action="store_true", help="also write up/down/updown pieces through the files of each (width, seed)")
+    ap.add_argument("--token", default=None, help="your API token (otherwise $LATENTFT_TOKEN, or the file ~/.config/flowedit/token)")
+    ap.add_argument("--save-token", action="store_true", help="also write --token to ~/.config/flowedit/token, so later runs need no --token")
     ap.add_argument("--hub", default=None, help="another service, e.g. http://127.0.0.1:8765 for your own latentft_server.py")
     args = ap.parse_args()
 
@@ -110,7 +112,14 @@ def main():
     lo, hi, K = args.centres; K = int(K)
     centres = np.geomspace(lo, hi, K)
     widths = args.widths or [args.octaves]
-    lf = LatentFT(client="render_sweep", **({"hub": args.hub} if args.hub else {}))
+    if args.token and args.save_token:
+        f = Path.home() / ".config" / "flowedit" / "token"; f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(args.token.strip() + "\n"); f.chmod(0o600); print(f"token saved to {f}", flush=True)
+    try:
+        lf = LatentFT(token=args.token, client="render_sweep", **({"hub": args.hub} if args.hub else {}))
+    except RuntimeError as e:
+        sys.exit(f"{e}\nYour token is in your sign-in link (https://latentft.csail.mit.edu/#token=...) or from your instructor. "
+                 "Run once with --token YOUR_TOKEN --save-token and it is remembered.")
     manifest_path = out / "manifest.json"
     planned = {f"{args.kind}_s{sd}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav" for sd in args.seeds for w in widths for i, fc in enumerate(centres)}
     others = sorted(f.name for f in out.glob("*.wav") if f.name not in planned)

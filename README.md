@@ -38,6 +38,18 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
   `docs/API.md`: the wire format, for SuperCollider, Max, curl, or your own client.
 - `own-gpu-engaging/`: running the model yourself on MIT's Engaging cluster (needs the weights: see `WEIGHTS.md`).
 
+**Your API token.** Every call to the service needs your token: the personal one in your sign-in link
+(`https://latentft.csail.mit.edu/#token=...`, the part after `token=`) or the class token from your instructor. The
+first time, give it on the command line and let the command remember it:
+
+```
+latentft-sweep --token YOUR_TOKEN --save-token --out my_sweep --glides
+```
+
+After that no token is needed in commands: it is read from `~/.config/flowedit/token` (the same file the FlowEdit
+tools use). Alternatives: `export LATENTFT_TOKEN=YOUR_TOKEN` in the shell, or `LatentFT(token="...")` in Python. The
+hosted notebook has your token on file already. Keep it private: anyone with it renders as you, in your history.
+
 The outcome of part 2 is a folder of same-length WAVs and a manifest.
 
 ## 3 · Play them in Max — `3-play-in-max/`
