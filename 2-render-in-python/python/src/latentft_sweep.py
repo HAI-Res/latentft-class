@@ -1,6 +1,6 @@
 """Render a whole sweep as a job: many files, unattended, resumable. Tutorial part 2, the "slew of files" at scale.
 
-    latentft-sweep song.wav --start 120 --seconds 30 --out my_sweep \\
+    latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep \\
         --centres 0.4 16 24 --octaves 2 --kind band --model stereo --stereo-mode mid
 
     nohup latentft-sweep ... > sweep.log 2>&1 &          # leave it running; re-run the same command to resume
@@ -54,7 +54,12 @@ def main():
     args = ap.parse_args()
 
     out = Path(args.out).expanduser(); out.mkdir(parents=True, exist_ok=True)
-    y, sr = sf.read(args.audio, dtype="float32", always_2d=True)
+    if not Path(args.audio).expanduser().is_file():
+        sys.exit(f"no such audio file: {args.audio}  (give the path to a WAV/FLAC/AIFF you have, e.g. ~/Music/song.wav)")
+    try:
+        y, sr = sf.read(str(Path(args.audio).expanduser()), dtype="float32", always_2d=True)
+    except Exception as e:  # noqa: BLE001
+        sys.exit(f"could not read {args.audio} as audio ({e}); use WAV, FLAC, AIFF or OGG (convert MP3s first)")
     seg = y[int(args.start * sr): int((args.start + args.seconds) * sr)]
     lo, hi, K = args.centres; K = int(K)
     centres = np.geomspace(lo, hi, K)
