@@ -33,10 +33,13 @@ hosted notebook has your token on file already. Keep it private: anyone with it 
 
       pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple
 
-- **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command, resumably
-  (one file per zone centre, any number, several widths or seeds, a manifest, optional glide pieces):
+- **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command, resumably.
+  By default it is a **lowpass sweep**: one file per cutoff, climbing from 0.25 Hz to the top of the axis (43 Hz); each
+  keeps every rate of change below its cutoff and lets the decoder regenerate the rest, so the files go from almost no
+  motion to the full song. `--kind highpass` keeps the rates above instead; `--kind band` / `notch` keep or erase a
+  zone that moves. A manifest and, with `--glides`, crossfaded pieces come with it:
 
-      latentft-sweep --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+      latentft-sweep --out my_sweep --glides
 
   With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
   path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run

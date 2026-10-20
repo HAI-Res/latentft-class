@@ -6,9 +6,11 @@
 
     (installed by the latentft-lab package; run the same command again to resume an interrupted sweep)
 
-What it does: one render per zone centre (log-spaced from lo to hi, K of them), every render from one seed so the
-files line up, written as WAV into --out with a manifest.json (index, file, centre, octaves, what was kept in bins and
-Hz). Calls go to the service 48 renders at a time; a file that already exists is skipped, so an interrupted job
+What it does (default): a LOWPASS sweep. One render per cutoff, K cutoffs log-spaced from 0.25 to 43 Hz; each keeps
+every rate of change below its cutoff (soft half-octave edge) and lets the decoder regenerate the rest, so the sweep
+goes from almost no motion to the full reconstruction. --kind highpass keeps the rates above instead; --kind band /
+notch keep or erase a zone (--octaves wide) that moves up the axis. Every render comes from one seed so the
+files line up, written as WAV into --out with a manifest.json (index, file, cutoff or centre, what was kept in bins and Hz). Calls go to the service 48 renders at a time; a file that already exists is skipped, so an interrupted job
 continues where it stopped, and the service answers an identical request from its cache, so repeats cost no GPU.
 With --glides it also writes up / down / up-and-down pieces that crossfade through the files (latentft_viz.xfade_sweep)
 into glides/. The renders themselves are the only WAVs at the top level, so a folder loader (the Max crossfader's
@@ -32,7 +34,7 @@ import soundfile as sf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from latentft_client import SR, LatentFT, keep  # noqa: E402
-from latentft_viz import soft_octave, xfade_sweep  # noqa: E402
+from latentft_viz import soft_octave, soft_pass, xfade_sweep  # noqa: E402
 
 
 SITE = "https://latentft.csail.mit.edu"
@@ -77,10 +79,15 @@ def main():
     ap.add_argument("--seconds", type=float, default=30.0, help="selection length, 5.944..30")
     ap.add_argument("--out", default=None, help="output folder (default: named after the sweep). If it already holds a "
                     "different sweep, a new folder name-2, name-3, ... is made instead; the same sweep resumes in place")
-    ap.add_argument("--centres", nargs=3, type=float, default=[0.4, 16.0, 16], metavar=("LO_HZ", "HI_HZ", "K"))
+    ap.add_argument("--centres", nargs=3, type=float, default=None, metavar=("LO_HZ", "HI_HZ", "K"),
+                    help="the K cutoffs (lowpass/highpass) or zone centres (band/notch), log-spaced from LO to HI Hz "
+                         "(default 0.25 43 16 for lowpass/highpass, 0.4 16 16 for band/notch)")
+    ap.add_argument("--edge", type=float, default=0.5, help="lowpass/highpass: width of the soft edge at the cutoff, octaves")
     ap.add_argument("--widths", nargs="+", type=float, default=None, help="zone widths in octaves (default: --octaves only)")
     ap.add_argument("--octaves", type=float, default=2.0)
-    ap.add_argument("--kind", choices=["band", "notch"], default="band", help="keep the zone, or erase it")
+    ap.add_argument("--kind", choices=["lowpass", "highpass", "band", "notch"], default="lowpass",
+                    help="lowpass (default): keep the rates below a cutoff that climbs; highpass: above it; "
+                         "band: keep a zone (--octaves wide) that moves; notch: erase it")
     ap.add_argument("--model", default="stereo")
     ap.add_argument("--stereo-mode", choices=["lr", "mid"], default="mid")
     ap.add_argument("--seeds", nargs="+", type=int, default=[0])
@@ -104,7 +111,8 @@ def main():
         args.start = 0.0
     if args.out is None:
         src = Path(args.audio).stem if not args.audio.endswith(".mp3") or "/tracks/" not in args.audio else args.track
-        args.out = f"sweep_{src}_{args.kind}_{'-'.join(f'{w:g}' for w in (args.widths or [args.octaves]))}oct_{int(args.centres[2])}"
+        tag = "" if args.kind in ("lowpass", "highpass") else "_" + "-".join(f"{w:g}" for w in (args.widths or [args.octaves])) + "oct"
+        args.out = f"sweep_{src}_{args.kind}{tag}_{int(args.centres[2]) if args.centres else 16}"
     out = Path(args.out).expanduser()
     if not Path(args.audio).expanduser().is_file():
         sys.exit(f"no such audio file: {args.audio}  (give the path to a WAV/FLAC/AIFF you have, e.g. ~/Music/song.wav)")
@@ -113,9 +121,12 @@ def main():
     except Exception as e:  # noqa: BLE001
         sys.exit(f"could not read {args.audio} as audio ({e}); use WAV, FLAC, AIFF or OGG (convert MP3s first)")
     seg = y[int(args.start * sr): int((args.start + args.seconds) * sr)]
+    passk = args.kind in ("lowpass", "highpass")
+    if args.centres is None:
+        args.centres = [0.25, 43.0, 16] if passk else [0.4, 16.0, 16]
     lo, hi, K = args.centres; K = int(K)
     centres = np.geomspace(lo, hi, K)
-    widths = args.widths or [args.octaves]
+    widths = [args.edge] if passk else (args.widths or [args.octaves])
     if args.token and args.save_token:
         f = Path.home() / ".config" / "flowedit" / "token"; f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text(args.token.strip() + "\n"); f.chmod(0o600); print(f"token saved to {f}", flush=True)
@@ -124,8 +135,9 @@ def main():
     except RuntimeError as e:
         sys.exit(f"{e}\nYour token is in your sign-in link (https://latentft.csail.mit.edu/#token=...) or from your instructor. "
                  "Run once with --token YOUR_TOKEN --save-token and it is remembered.")
-    manifest_path = out / "manifest.json"
-    planned = {f"{args.kind}_s{sd}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav" for sd in args.seeds for w in widths for i, fc in enumerate(centres)}
+    def fname(seed, w, i, fc):
+        return (f"{args.kind}_s{seed}_{i:03d}_{fc:.2f}Hz.wav" if passk else f"{args.kind}_s{seed}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav")
+    planned = {fname(sd, w, i, fc) for sd in args.seeds for w in widths for i, fc in enumerate(centres)}
 
     def same_sweep(d: Path) -> bool:
         """Empty, or holds only renders of this sweep with the same clip (so it can be resumed)."""
@@ -148,31 +160,37 @@ def main():
     if out != base:
         print(f"{base} holds a different sweep, so this one goes in {out}", flush=True)
     out.mkdir(parents=True, exist_ok=True)
+    manifest_path = out / "manifest.json"          # after the folder is settled (it may have become name-2)
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {
         "audio": str(args.audio), "start_s": args.start, "seconds": args.seconds, "model": args.model, "stereo_mode": args.stereo_mode,
         "kind": args.kind, "steps": args.steps, "sr": SR, "renders": []}
     manifest["renders"] = [r for r in manifest["renders"] if r["file"] in planned and (out / r["file"]).is_file()]
     done = {r["file"] for r in manifest["renders"]}
     t0 = time.time()
+    i_of = {}
     for seed in args.seeds:
         for w in widths:
             plan = []                                       # (file name, centre, spec) for this (seed, width)
             for i, fc in enumerate(centres):
-                name = f"{args.kind}_s{seed}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav"
-                m = soft_octave(fc, w)
-                plan.append((name, fc, keep(mask=(m if args.kind == "band" else 1 - m))))
+                name = fname(seed, w, i, fc)
+                if passk:
+                    m = soft_pass(fc, args.kind, w)
+                else:
+                    m = soft_octave(fc, w); m = m if args.kind == "band" else 1 - m
+                plan.append((name, fc, keep(mask=m))); i_of[name] = i
             todo = [p for p in plan if p[0] not in done]
-            print(f"seed {seed}, width {w:g} oct: {len(plan)} files, {len(todo)} to render", flush=True)
+            print(f"seed {seed}, " + (f"{args.kind} cutoff {centres[0]:.2f} -> {centres[-1]:.2f} Hz" if passk else f"width {w:g} oct")
+                  + f": {len(plan)} files, {len(todo)} to render", flush=True)
             for c0 in range(0, len(todo), 48):              # the service takes at most 48 renders per call
                 chunk = todo[c0: c0 + 48]
-                lf._label = f"  seed {seed}, {w:g} oct: renders {c0 + 1}-{c0 + len(chunk)} of {len(todo)}"
+                lf._label = f"  renders {c0 + 1}-{c0 + len(chunk)} of {len(todo)}"
                 res = lf.render(seg, sr, [{"a": p[2]} for p in chunk], model=args.model, seconds=args.seconds, seed=seed, steps=args.steps,
                                 stereo_mode=args.stereo_mode, include_ref=(c0 == 0 and not done))
                 for j, (name, fc, _) in enumerate(chunk):
                     sf.write(out / name, res.audio(j), SR)
                     k = res.keep(j)
-                    manifest["renders"].append({"file": name, "seed": seed, "octaves": w, "centre_hz": round(float(fc), 4), "kind": args.kind,
-                                                "index": int(name.split("_")[3]), "keep_hz": k["hz"] if k["hz"] is not None else k["support_hz"],
+                    manifest["renders"].append({"file": name, "seed": seed, "kind": args.kind, "index": int(i_of[name]),
+                                                **({"cutoff_hz": round(float(fc), 4), "edge_octaves": w} if passk else {"centre_hz": round(float(fc), 4), "octaves": w}), "keep_hz": k["hz"] if k["hz"] is not None else k["support_hz"],
                                                 "full_gain_hz": k["full_hz"], "bins_kept": k["bins_kept"]})
                     done.add(name)
                 if c0 == 0 and res.clip_a.get("ref_wav_b64") and not (out / "ref" / "what_the_model_hears.wav").is_file():
@@ -185,8 +203,8 @@ def main():
                 (out / "glides").mkdir(exist_ok=True)
                 for pname, passes in (("up", [True]), ("down", [False]), ("updown", [True, False])):
                     piece = xfade_sweep(parts, passes)
-                    sf.write(out / "glides" / f"glide_{pname}_s{seed}_w{w:g}oct.wav", piece, SR)
-                print(f"  glides written for seed {seed}, width {w:g}", flush=True)
+                    sf.write(out / "glides" / (f"glide_{pname}_s{seed}.wav" if passk else f"glide_{pname}_s{seed}_w{w:g}oct.wav"), piece, SR)
+                print(f"  glides written for seed {seed}" + ("" if passk else f", width {w:g} oct"), flush=True)
     (out / "ref").mkdir(exist_ok=True)
     sf.write(out / "ref" / "original.wav", seg if sr == SR else __import__("librosa").resample(seg.T, orig_sr=sr, target_sr=SR).T, SR)
     print(f"done: {len(manifest['renders'])} files in {out} ({time.time() - t0:.0f} s)")

@@ -35,6 +35,20 @@ def soft_octave(fc: float, octaves: float = 1.0) -> np.ndarray:
     return g
 
 
+def soft_pass(fc: float, kind: str = "lowpass", edge_octaves: float = 0.5) -> np.ndarray:
+    """Keep everything below (lowpass) or above (highpass) the cutoff fc, with a raised-cosine edge
+    `edge_octaves` wide in log frequency centred on fc. Bin 0 (the mean) is 1 for lowpass, 0 for highpass."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x = np.log2(F / fc) / max(edge_octaves, 1e-6) + 0.5          # 0 at the bottom of the edge, 1 at the top
+        g = np.where(x <= 0, 1.0, np.where(x >= 1, 0.0, 0.5 + 0.5 * np.cos(np.pi * x)))
+    g[0] = 1.0
+    if kind == "highpass":
+        g = 1.0 - g
+    elif kind != "lowpass":
+        raise ValueError("kind is lowpass or highpass")
+    return g.astype(np.float32)
+
+
 def xfade_sweep(renders: list[np.ndarray], passes: list[bool] = (True,), repeats: int = 1) -> np.ndarray:
     """A piece: per pass the clip plays `repeats` times while the active render moves linearly through the list
     (True = up, False = down), equal-power crossfade between neighbours. Renders must share the seed (they do

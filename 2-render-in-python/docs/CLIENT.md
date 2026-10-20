@@ -425,7 +425,7 @@ notebook's file browser (right-click the zip).
 ### A sweep as a job (`latentft-sweep`)
 
 ```
-latentft-sweep --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+latentft-sweep --out my_sweep --glides
 ```
 
 With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; `--track ID` picks another class track (`--list-tracks`), and a path as the first argument uses your own file (`--start` where to begin).
@@ -439,7 +439,7 @@ uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple
 It prints its progress as it goes. If it stops (you close the terminal, the network drops), run the same command
 again: it picks up where it left off.
 
-Installed with the package. One render per zone centre (K log-spaced centres from LO to HI Hz), `--widths 1 2 3` and
+Installed with the package. Default: a lowpass sweep, one render per cutoff (16 cutoffs log-spaced 0.25 to 43 Hz, a soft half-octave edge, `--edge`). `--kind highpass | band | notch` for the others; for band/notch, one render per zone centre (K log-spaced centres from LO to HI Hz), `--widths 1 2 3` and
 `--seeds 0 1 2` for more axes, `--kind notch` to erase instead of keep, `--stereo-mode mid|lr`, `--model`. Writes the
 renders as the only top-level WAVs (so the Max crossfader's folder loader sees just them), `manifest.json` after
 every 48, `ref/` (the original and the vocoder reference) and with `--glides` the crossfaded pieces in `glides/`.
