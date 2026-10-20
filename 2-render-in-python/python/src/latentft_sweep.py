@@ -44,7 +44,7 @@ def class_tracks(hub: str | None = None) -> list[dict]:
     with urllib.request.urlopen(f"{base}/loops/tracks.json", timeout=60) as r:
         items = json.loads(r.read())
     items = items.get("tracks", []) if isinstance(items, dict) else items   # {sr, note, tracks: [...]}
-    return [t for t in items if t.get("group") == "song"] or items
+    return [t for t in items if t.get("loop_seconds") is None] or items      # whole pieces (loops are excluded)
 
 
 def fetch_track(track_id: str, hub: str | None = None) -> str:
@@ -90,7 +90,7 @@ def main():
 
     if args.list_tracks:
         for t in class_tracks(args.hub):
-            print(f"{t['id']:<28} {t['seconds']:6.0f} s  {t['title']} — {t['credit']}")
+            print(f"{t['id']:<32} {t['seconds']:6.0f} s  {t.get('group', ''):<14} {t['title']} — {t['credit']}")
         return
     if args.audio is None:
         args.audio = fetch_track(args.track, args.hub)
