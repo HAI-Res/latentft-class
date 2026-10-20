@@ -48,7 +48,7 @@ hosted notebook has your token on file already. Keep it private: anyone with it 
 
   With [uv](https://docs.astral.sh/uv/), no install needed:
 
-      uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+      uvx --python 3.12 --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
 
 - `python/`: that package's source (`pip install ./python` also works).
 - `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.
