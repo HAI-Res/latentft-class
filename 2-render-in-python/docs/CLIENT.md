@@ -443,7 +443,7 @@ Installed with the package. One render per zone centre (K log-spaced centres fro
 `--seeds 0 1 2` for more axes, `--kind notch` to erase instead of keep, `--stereo-mode mid|lr`, `--model`. Writes the
 renders as the only top-level WAVs (so the Max crossfader's folder loader sees just them), `manifest.json` after
 every 48, `ref/` (the original and the vocoder reference) and with `--glides` the crossfaded pieces in `glides/`.
-Existing files are skipped, so an interrupted job continues; identical requests are cache hits on the service.
+Existing files are skipped, so an interrupted job continues (a folder holding a different sweep gets a new name, `my_sweep-2`, …); identical requests are cache hits on the service.
 On Engaging, the same command inside an `sbatch` script with `--hub http://127.0.0.1:8765` against your own server
 (`own-gpu-engaging/`) is the batch route.
 

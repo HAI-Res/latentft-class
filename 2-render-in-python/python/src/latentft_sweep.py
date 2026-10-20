@@ -1,6 +1,6 @@
 """Render a whole sweep as a job: many files, unattended, resumable. Tutorial part 2, the "slew of files" at scale.
 
-    latentft-sweep --out my_sweep        # no file: Bob Dylan's The Man in Me from 2:00, fetched from the class site
+    latentft-sweep                       # no file: Bob Dylan's The Man in Me from 2:00; folder named after the sweep
     latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep \\
         --centres 0.4 16 24 --octaves 2 --kind band --model stereo --stereo-mode mid
 
@@ -75,7 +75,8 @@ def main():
     ap.add_argument("--list-tracks", action="store_true", help="list the class tracks and exit")
     ap.add_argument("--start", type=float, default=None, help="where the selection starts, s (default 0; 120 for the default track)")
     ap.add_argument("--seconds", type=float, default=30.0, help="selection length, 5.944..30")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--out", default=None, help="output folder (default: named after the sweep). If it already holds a "
+                    "different sweep, a new folder name-2, name-3, ... is made instead; the same sweep resumes in place")
     ap.add_argument("--centres", nargs=3, type=float, default=[0.4, 16.0, 16], metavar=("LO_HZ", "HI_HZ", "K"))
     ap.add_argument("--widths", nargs="+", type=float, default=None, help="zone widths in octaves (default: --octaves only)")
     ap.add_argument("--octaves", type=float, default=2.0)
@@ -101,7 +102,10 @@ def main():
         print(f"no audio file given: using the class track {args.track} ({args.audio}), from {args.start:g} s", flush=True)
     if args.start is None:
         args.start = 0.0
-    out = Path(args.out).expanduser(); out.mkdir(parents=True, exist_ok=True)
+    if args.out is None:
+        src = Path(args.audio).stem if not args.audio.endswith(".mp3") or "/tracks/" not in args.audio else args.track
+        args.out = f"sweep_{src}_{args.kind}_{'-'.join(f'{w:g}' for w in (args.widths or [args.octaves]))}oct_{int(args.centres[2])}"
+    out = Path(args.out).expanduser()
     if not Path(args.audio).expanduser().is_file():
         sys.exit(f"no such audio file: {args.audio}  (give the path to a WAV/FLAC/AIFF you have, e.g. ~/Music/song.wav)")
     try:
@@ -122,10 +126,28 @@ def main():
                  "Run once with --token YOUR_TOKEN --save-token and it is remembered.")
     manifest_path = out / "manifest.json"
     planned = {f"{args.kind}_s{sd}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav" for sd in args.seeds for w in widths for i, fc in enumerate(centres)}
-    others = sorted(f.name for f in out.glob("*.wav") if f.name not in planned)
-    if others:
-        sys.exit(f"{out} already holds {len(others)} renders from a different sweep (e.g. {others[0]}).\n"
-                 f"One folder = one sweep, so the Max crossfader loads only these files: use a new --out, or delete the folder.")
+
+    def same_sweep(d: Path) -> bool:
+        """Empty, or holds only renders of this sweep with the same clip (so it can be resumed)."""
+        if not d.exists():
+            return True
+        if any(f.name not in planned for f in d.glob("*.wav")):
+            return False
+        mf = d / "manifest.json"
+        if mf.is_file():
+            m = json.loads(mf.read_text())
+            if (m.get("audio"), m.get("start_s"), m.get("seconds"), m.get("model"), m.get("stereo_mode")) != \
+                    (str(args.audio), args.start, args.seconds, args.model, args.stereo_mode):
+                return False
+        return True
+
+    base, k = out, 1
+    while not same_sweep(out):                     # one folder = one sweep: never mix two in one folder
+        k += 1
+        out = base.with_name(f"{base.name}-{k}")
+    if out != base:
+        print(f"{base} holds a different sweep, so this one goes in {out}", flush=True)
+    out.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {
         "audio": str(args.audio), "start_s": args.start, "seconds": args.seconds, "model": args.model, "stereo_mode": args.stereo_mode,
         "kind": args.kind, "steps": args.steps, "sr": SR, "renders": []}

@@ -41,6 +41,7 @@ hosted notebook has your token on file already. Keep it private: anyone with it 
   With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
   path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run
   the same command again and it picks up where it left off.
+  If `--out` already holds a different sweep, it makes a new folder (`my_sweep-2`, `my_sweep-3`, …) instead of mixing them.
 
   With [uv](https://docs.astral.sh/uv/), no install needed:
 
