@@ -31,7 +31,7 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
 
   With [uv](https://docs.astral.sh/uv/), no install needed:
 
-      uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+      uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
 
 - `python/`: that package's source (`pip install ./python` also works).
 - `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.

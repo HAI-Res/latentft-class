@@ -41,7 +41,7 @@ own next to your notebook (numpy, soundfile and librosa needed; matplotlib for p
 With uv, the sweep command runs without installing anything:
 
 ```
-uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
 ```
 
 ## latentft_client
@@ -420,7 +420,7 @@ With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from t
 With [uv](https://docs.astral.sh/uv/) you can skip the install and run it in one line:
 
 ```
-uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
 ```
 
 It prints its progress as it goes. If it stops (you close the terminal, the network drops), run the same command

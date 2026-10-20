@@ -112,9 +112,15 @@ def main():
     widths = args.widths or [args.octaves]
     lf = LatentFT(client="render_sweep", **({"hub": args.hub} if args.hub else {}))
     manifest_path = out / "manifest.json"
+    planned = {f"{args.kind}_s{sd}_w{w:g}oct_{i:03d}_{fc:.2f}Hz.wav" for sd in args.seeds for w in widths for i, fc in enumerate(centres)}
+    others = sorted(f.name for f in out.glob("*.wav") if f.name not in planned)
+    if others:
+        sys.exit(f"{out} already holds {len(others)} renders from a different sweep (e.g. {others[0]}).\n"
+                 f"One folder = one sweep, so the Max crossfader loads only these files: use a new --out, or delete the folder.")
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {
         "audio": str(args.audio), "start_s": args.start, "seconds": args.seconds, "model": args.model, "stereo_mode": args.stereo_mode,
         "kind": args.kind, "steps": args.steps, "sr": SR, "renders": []}
+    manifest["renders"] = [r for r in manifest["renders"] if r["file"] in planned and (out / r["file"]).is_file()]
     done = {r["file"] for r in manifest["renders"]}
     t0 = time.time()
     for seed in args.seeds:
