@@ -28,9 +28,9 @@ def soft_band(f0: float, width_hz: float) -> np.ndarray:
 
 def soft_octave(fc: float, octaves: float = 1.0) -> np.ndarray:
     """Raised cosine in log frequency: gain 1 at fc, 0 at fc * 2^(+-octaves/2). Bin 0 is 0 (the service's dc rule decides)."""
-    with np.errstate(divide="ignore"):
+    with np.errstate(divide="ignore", invalid="ignore"):      # bin 0 is log2(0) = -inf; masked out just below
         d = np.abs(np.log2(F / fc)) / (octaves / 2)
-    g = np.where(d < 1, 0.5 + 0.5 * np.cos(np.pi * d), 0.0)
+        g = np.where(d < 1, 0.5 + 0.5 * np.cos(np.pi * d), 0.0)
     g[0] = 0.0
     return g
 

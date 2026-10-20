@@ -12,3 +12,5 @@ bulk render, save with a manifest), keep-spec helpers (`keep`, `soft_band`, `sof
     from latentft_viz import soft_octave, show_all
 
 Also installs the `latentft-sweep` command: a whole sweep as a resumable job (`latentft-sweep --help`).
+
+With uv, no install: `uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides`

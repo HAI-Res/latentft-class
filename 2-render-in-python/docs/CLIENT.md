@@ -38,6 +38,12 @@ Then `from latentft_client import LatentFT, keep` and `from latentft_viz import 
 pip, the two files `latentft_client.py` and `latentft_viz.py` from https://latentft.csail.mit.edu/notebook/ work on their
 own next to your notebook (numpy, soundfile and librosa needed; matplotlib for pictures).
 
+With uv, the sweep command runs without installing anything:
+
+```
+uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+```
+
 ## latentft_client
 
 ### Constants
@@ -410,6 +416,12 @@ latentft-sweep --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glid
 ```
 
 With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; `--track ID` picks another class track (`--list-tracks`), and a path as the first argument uses your own file (`--start` where to begin).
+
+With [uv](https://docs.astral.sh/uv/) you can skip the install and run it in one line:
+
+```
+uvx --from latentft-lab --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+```
 
 It prints its progress as it goes. If it stops (you close the terminal, the network drops), run the same command
 again: it picks up where it left off.

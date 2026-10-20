@@ -1,6 +1,6 @@
 [project]
 name = "latentft-lab"
-version = "0.2.7"
+version = "0.2.8"
 description = "Client and pictures for the LatentFT class service (HAI-Res, MIT): render with per-bin rate masks, blends and the raw latent, on the lab GPU or your own"
 readme = "README.md"
 requires-python = ">=3.10"
