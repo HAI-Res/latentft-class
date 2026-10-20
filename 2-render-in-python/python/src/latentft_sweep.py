@@ -143,6 +143,7 @@ def main():
             print(f"seed {seed}, width {w:g} oct: {len(plan)} files, {len(todo)} to render", flush=True)
             for c0 in range(0, len(todo), 48):              # the service takes at most 48 renders per call
                 chunk = todo[c0: c0 + 48]
+                lf._label = f"  seed {seed}, {w:g} oct: renders {c0 + 1}-{c0 + len(chunk)} of {len(todo)}"
                 res = lf.render(seg, sr, [{"a": p[2]} for p in chunk], model=args.model, seconds=args.seconds, seed=seed, steps=args.steps,
                                 stereo_mode=args.stereo_mode, include_ref=(c0 == 0 and not done))
                 for j, (name, fc, _) in enumerate(chunk):

@@ -271,8 +271,59 @@ class Encoded:
         return f"<LatentFT latent {self.z.shape} from {self.model}, {len(self.freqs)} rate bins x {self.bin_hz:.4f} Hz>"
 
 
+# GPU seconds per (render x model window), learned from finished requests; these are the first guesses (one L40S /
+# RTX 6000, 35 steps, batch 16, measured 2026-10-19). Plus a fixed overhead per request (upload, vocoder, download).
+_RATE_GUESS = {"mono": 0.30, "stereo": 0.65, "unet": 0.80}
+_OVERHEAD_S = 3.0
+
+
+def _windows(seconds: float) -> int:
+    """Model windows a selection is rendered as (5.944 s each, overlapping by at least 0.25 s)."""
+    if seconds <= WINDOW_S + 1e-6:
+        return 1
+    return max(2, int(np.ceil((seconds - 0.25) / (WINDOW_S - 0.25))))
+
+
+class _Progress:
+    """One status line, rewritten once a second while a request is out: elapsed, estimated remaining, a bar.
+    Plain text, no animation beyond the 1-second update; prints nothing for requests that finish within a second."""
+
+    def __init__(self, label: str, est_s: float, enabled: bool):
+        import threading
+        self.label, self.est, self.enabled = label, max(est_s, 1.0), enabled
+        self.t0 = time.time(); self._stop = threading.Event(); self._shown = False
+        self._th = threading.Thread(target=self._run, daemon=True)
+        if enabled:
+            self._th.start()
+
+    def _line(self, final: str | None = None) -> str:
+        el = time.time() - self.t0
+        if final:
+            return f"\r{self.label}: {final} in {el:4.0f} s" + " " * 40
+        frac = min(el / self.est, 0.99)
+        bar = "#" * int(frac * 24) + "." * (24 - int(frac * 24))
+        left = self.est - el
+        rest = f"about {left:3.0f} s left" if left > 0 else "taking longer than estimated (queue, or a slow GPU)"
+        return f"\r{self.label}: [{bar}] {el:4.0f} s, {rest}   "
+
+    def _run(self):
+        while not self._stop.wait(1.0):
+            print(self._line(), end="", flush=True); self._shown = True
+
+    def done(self, how: str = "done"):
+        if not self.enabled:
+            return
+        self._stop.set(); self._th.join(timeout=2)
+        if self._shown:
+            print(self._line(how), flush=True)
+
+
 class LatentFT:
-    def __init__(self, token: str | None = None, hub: str = HUB, client: str = "notebook", require_token: bool | None = None):
+    def __init__(self, token: str | None = None, hub: str = HUB, client: str = "notebook", require_token: bool | None = None,
+                 progress: bool = True):
+        """progress: print a status line (elapsed, estimated time left) while a request is out; False for silence."""
+        self.progress = progress
+        self._rate = dict(_RATE_GUESS)
         self.hub, self.client = hub.rstrip("/"), client
         local = self.hub.startswith("http://127.0.0.1") or self.hub.startswith("http://localhost")
         self.token = _token(token, required=(not local) if require_token is None else require_token)
@@ -286,6 +337,7 @@ class LatentFT:
         from latentft_demo import Demo
         self = cls.__new__(cls)
         self.hub, self.client, self.token = "in-process", "notebook", None
+        self.progress, self._rate = True, dict(_RATE_GUESS)
         self._demo = Demo(models, device=device or ("cuda" if torch.cuda.is_available() else "cpu"))
         return self
 
@@ -294,7 +346,31 @@ class LatentFT:
         with urllib.request.urlopen(f"{self.hub}{path}", timeout=60) as r:
             return r.read()
 
-    def _post(self, body: dict) -> dict:
+    def _estimate(self, body: dict) -> tuple[float, int]:
+        """(estimated seconds, render-windows) for a request, from the learned GPU rate for its model."""
+        n = len(body.get("renders") or []) or 1
+        w = _windows(float(body.get("seconds") or WINDOW_S)) if body.get("op", "render") == "render" else 1
+        units = n * w
+        return _OVERHEAD_S + units * self._rate.get(body.get("model", "mono"), 0.6), units
+
+    def _post(self, body: dict, label: str | None = None) -> dict:
+        est, units = self._estimate(body)
+        n = len(body.get("renders") or [])
+        label = label or (f"{body.get('op', 'render')} {n} render{'s' if n != 1 else ''}" + (f" x {units // max(n, 1)} windows" if units > n else "")
+                          + f", {body.get('model', 'mono')}")
+        bar = _Progress(label, est, bool(getattr(self, "progress", True)))
+        try:
+            d = self._post_raw(body)
+        except BaseException:
+            bar.done("failed"); raise
+        gpu = d.get("render_s")
+        if gpu and units and gpu > 0.5:              # learn this model's rate (a cache hit has the old render_s; fine)
+            m = body.get("model", "mono"); r = max(gpu - 1.0, 0.1) / units
+            self._rate[m] = 0.5 * self._rate.get(m, r) + 0.5 * r
+        bar.done("done")
+        return d
+
+    def _post_raw(self, body: dict) -> dict:
         if self._demo is not None:
             return self._demo.handle(json.loads(json.dumps(body)))
         headers = {"Content-Type": "application/json", "X-FlowEdit-Client": self.client}
@@ -378,16 +454,21 @@ class LatentFT:
             body["bpm_a"] = float(bpm_a)
         if bpm_b:
             body["bpm_b"] = float(bpm_b)
-        return Result(self._post(body))
+        return Result(self._post(body, getattr(self, "_label", None)))
 
     def render_many(self, a: np.ndarray, sr: int, renders: list[dict], chunk: int = 48, progress=print, **kw) -> Result:
         """Any number of renders, in calls of `chunk` (the service takes at most 48 per call), merged into one Result.
         Same clip, same seed in every call, so all of them share the noise and line up, as in one call."""
         parts = []
-        for i in range(0, len(renders), chunk):
-            parts.append(self.render(a, sr, renders[i: i + chunk], **kw))
-            if progress:
-                progress(f"  {min(i + chunk, len(renders))}/{len(renders)} renders, {parts[-1].render_s} s on the GPU")
+        total = len(renders)
+        for i in range(0, total, chunk):
+            self._label = f"renders {i + 1}-{min(i + chunk, total)} of {total}"
+            try:
+                parts.append(self.render(a, sr, renders[i: i + chunk], **kw))
+            finally:
+                self._label = None
+            if progress and not getattr(self, "progress", True):
+                progress(f"  {min(i + chunk, total)}/{total} renders, {parts[-1].render_s} s on the GPU")
         d = dict(parts[0].raw)
         d["renders"] = [r for p in parts for r in p.renders]
         d["render_s"] = round(sum(p.render_s or 0 for p in parts), 2)
@@ -414,4 +495,4 @@ class LatentFT:
                 "format": "flac", "rate_detail": rate_detail}
         if stereo_mode != "lr":
             body["stereo_mode"] = stereo_mode
-        return Result(self._post(body))
+        return Result(self._post(body, getattr(self, "_label", None)))
