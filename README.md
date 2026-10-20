@@ -13,6 +13,13 @@ Sabrina's MUGIC example. The MUGIC sensor (an IMU) sends its readings as OSC ove
 The outcome of part 1 is a number between 0 and 1 that follows your movement.
 
 ## 2 · Render a slew of files in Python — `2-render-in-python/`
+
+**First, your API token.** Every call to the service needs one: the personal token in your sign-in link
+(`https://latentft.csail.mit.edu/#token=...`, the part after `token=`), or the class token from your instructor.
+Keep it private: anyone with it renders as you. The commands below take it with `--token YOUR_TOKEN --save-token`
+the first time; `--save-token` writes it to `~/.config/flowedit/token`, so later commands (and the Python client)
+need no token at all. The hosted notebook has it on file already.
+
 - `notebook/LatentFT_lab.ipynb`: the lab notebook. The rate axis, masks bin by bin, blends, the latent itself, and
   in **section 8** a bulk render: a grid of masks, one WAV each, all from one seed so they line up, plus a
   `manifest.json` saying what each file kept. Run it hosted at https://latentft.csail.mit.edu/jupyter/ (sign in with
@@ -23,32 +30,23 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
 - **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command, resumably
   (one file per zone centre, any number, several widths or seeds, a manifest, optional glide pieces):
 
-      latentft-sweep --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+      latentft-sweep --token YOUR_TOKEN --save-token --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
 
   With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
-  path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run the same command again and
-  it picks up where it left off.
+  path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run
+  the same command again and it picks up where it left off.
 
   With [uv](https://docs.astral.sh/uv/), no install needed:
 
-      uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
+      uvx --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --token YOUR_TOKEN --save-token --out my_sweep --glides
+
+  After the first run, drop `--token YOUR_TOKEN --save-token`; the token is remembered. (Or set it for a shell with
+  `export LATENTFT_TOKEN=YOUR_TOKEN`.)
 
 - `python/`: that package's source (`pip install ./python` also works).
 - `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.
   `docs/API.md`: the wire format, for SuperCollider, Max, curl, or your own client.
 - `own-gpu-engaging/`: running the model yourself on MIT's Engaging cluster (needs the weights: see `WEIGHTS.md`).
-
-**Your API token.** Every call to the service needs your token: the personal one in your sign-in link
-(`https://latentft.csail.mit.edu/#token=...`, the part after `token=`) or the class token from your instructor. The
-first time, give it on the command line and let the command remember it:
-
-```
-latentft-sweep --token YOUR_TOKEN --save-token --out my_sweep --glides
-```
-
-After that no token is needed in commands: it is read from `~/.config/flowedit/token` (the same file the FlowEdit
-tools use). Alternatives: `export LATENTFT_TOKEN=YOUR_TOKEN` in the shell, or `LatentFT(token="...")` in Python. The
-hosted notebook has your token on file already. Keep it private: anyone with it renders as you, in your history.
 
 The outcome of part 2 is a folder of same-length WAVs and a manifest.
 
