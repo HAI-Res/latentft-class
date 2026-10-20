@@ -14,42 +14,47 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
 
 ## 2 · Render a slew of files in Python — `2-render-in-python/`
 
-**Your API token.** Every call to the service needs your token: the personal one in your sign-in link
-(`https://latentft.csail.mit.edu/#token=...`, the part after `token=`) or the class token from your instructor. The
+### The lab notebook
+`notebook/LatentFT_lab.ipynb`: the lab notebook. 
+The rate axis, masks bin by bin, blends, the latent itself, and in **section 8** a bulk render: a grid of masks, one WAV each, all from one seed so they line up, plus a
+`manifest.json` saying what each file kept. 
+Run it hosted at https://latentft.csail.mit.edu/jupyter/ (sign in with your token; everything is installed), or anywhere with
+
+### Python API wrapper
+
+You can install the python package or run it without installation using `uvx.` Skip to the bottom of this section to run with `uvx.`
+
+Install the package: `pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple`
+
+**Your API token.** Every call to the service needs your token: the personal one in your sign-in link. The
 first time, give it on the command line and let the command remember it:
 
 ```
 latentft-sweep --token YOUR_TOKEN --save-token --out my_sweep --glides
 ```
 
-After that no token is needed in commands: it is read from `~/.config/flowedit/token` (the same file the FlowEdit
-tools use). Alternatives: `export LATENTFT_TOKEN=YOUR_TOKEN` in the shell, or `LatentFT(token="...")` in Python. The
-hosted notebook has your token on file already. Keep it private: anyone with it renders as you, in your history.
+After that no token is needed in commands: it is read from `~/.config/flowedit/token` (the same file the FlowEdit tools use). 
+Alternatives: `export LATENTFT_TOKEN=YOUR_TOKEN` in the shell, or `LatentFT(token="...")` in Python or add the `--token [YOUR_TOKEN]` flag to the below commands. 
+Keep it private: anyone with it renders as you, in your history.
 
-- `notebook/LatentFT_lab.ipynb`: the lab notebook. The rate axis, masks bin by bin, blends, the latent itself, and
-  in **section 8** a bulk render: a grid of masks, one WAV each, all from one seed so they line up, plus a
-  `manifest.json` saying what each file kept. Run it hosted at https://latentft.csail.mit.edu/jupyter/ (sign in with
-  your token; everything is installed), or anywhere with
+**A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command.
+By default it is a **lowpass sweep**: one file per cutoff, climbing from 0.25 Hz to the top of the axis (43 Hz); each
+keeps every rate of change below its cutoff and lets the decoder regenerate the rest, so the files go from almost no
+motion to the full song. `--kind highpass` keeps the rates above instead; `--kind band` / `notch` keep or erase a
+zone that moves. A manifest and, with `--glides`, crossfaded pieces come with it:
 
-      pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple
+    latentft-sweep --out my_sweep --glides
 
-- **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command, resumably.
-  By default it is a **lowpass sweep**: one file per cutoff, climbing from 0.25 Hz to the top of the axis (43 Hz); each
-  keeps every rate of change below its cutoff and lets the decoder regenerate the rest, so the files go from almost no
-  motion to the full song. `--kind highpass` keeps the rates above instead; `--kind band` / `notch` keep or erase a
-  zone that moves. A manifest and, with `--glides`, crossfaded pieces come with it:
+With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
+path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run
+the same command again and it picks up where it left off.
+If `--out` already holds a different sweep, it makes a new folder (`my_sweep-2`, `my_sweep-3`, …) instead of mixing them.
 
-      latentft-sweep --out my_sweep --glides
+With [uv](https://docs.astral.sh/uv/), no install needed:
 
-  With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
-  path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run
-  the same command again and it picks up where it left off.
-  If `--out` already holds a different sweep, it makes a new folder (`my_sweep-2`, `my_sweep-3`, …) instead of mixing them.
+    uvx --python 3.12 --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides --token [YOUR_TOKEN]
 
-  With [uv](https://docs.astral.sh/uv/), no install needed:
-
-      uvx --python 3.12 --from latentft-lab@latest --index https://latentft.csail.mit.edu/pip/simple latentft-sweep --out my_sweep --glides
-
+Directory information:
 - `python/`: that package's source (`pip install ./python` also works).
 - `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.
   `docs/API.md`: the wire format, for SuperCollider, Max, curl, or your own client.
