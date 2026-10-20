@@ -403,6 +403,21 @@ paths = res.save("bulk_stereo_30s", prefix="zone")                       # WAVs 
 files by what each one kept (bins and Hz) without the notebook. Zip the folder and download it from the hosted
 notebook's file browser (right-click the zip).
 
+### A sweep as a job (`latentft-sweep`)
+
+```
+latentft-sweep song.wav --start 120 --seconds 30 --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+nohup latentft-sweep song.wav ... > sweep.log 2>&1 &        # unattended; run the same command again to resume
+```
+
+Installed with the package. One render per zone centre (K log-spaced centres from LO to HI Hz), `--widths 1 2 3` and
+`--seeds 0 1 2` for more axes, `--kind notch` to erase instead of keep, `--stereo-mode mid|lr`, `--model`. Writes the
+renders as the only top-level WAVs (so the Max crossfader's folder loader sees just them), `manifest.json` after
+every 48, `ref/` (the original and the vocoder reference) and with `--glides` the crossfaded pieces in `glides/`.
+Existing files are skipped, so an interrupted job continues; identical requests are cache hits on the service.
+On Engaging, the same command inside an `sbatch` script with `--hub http://127.0.0.1:8765` against your own server
+(`own-gpu-engaging/`) is the batch route.
+
 ### Saving
 
 ```python

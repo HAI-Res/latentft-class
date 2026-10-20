@@ -20,6 +20,12 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
 
       pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple
 
+- **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep unattended and resumably
+  (one file per zone centre, any number, several widths or seeds, a manifest, optional glide pieces):
+
+      latentft-sweep song.wav --start 120 --seconds 30 --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+      nohup latentft-sweep ... > sweep.log 2>&1 &     # leave it running; the same command again resumes
+
 - `python/`: that package's source (`pip install ./python` also works).
 - `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.
   `docs/API.md`: the wire format, for SuperCollider, Max, curl, or your own client.
