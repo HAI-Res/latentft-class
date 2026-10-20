@@ -1,24 +1,44 @@
-# LatentFT class: sensor → Python renders → Max
+# LatentFT class: 1 a sensor into Max → 2 renders from Python → 3 play them in Max
 
-Everything a student needs for the LatentFT lab in one place. The service itself (the GPU, the models, the weights)
-lives on the lab's machines and is reached through https://latentft.csail.mit.edu; nothing here needs a GPU or the
-model weights.
+Three pieces, in order. The LatentFT service (GPU, models, weights) runs on the lab's machines behind
+https://latentft.csail.mit.edu; nothing in this repo needs a GPU or the model weights.
 
-| part | folder | what you do |
-|---|---|---|
-| 1 · a sensor into Max | `max/mugic-udp/` | Sabrina's MUGIC example: the IMU sends OSC over UDP (port 4000); `mugic_receive.maxpat` receives and rebroadcasts it, `mugic_examples.maxpat` maps tilt to a slider and to a pitch. `MUGIC_SETUP.pdf` is the setup. `mugic_capture.py` prints or records the readings (`uv run mugic_capture.py take1.csv`). |
-| 2 · render a slew of files in Python | `notebook/LatentFT_lab.ipynb`, `python/` | The lab notebook: the rate axis, masks bin by bin, blends, the latent itself, and in section 8 a bulk render: a grid of masks, one WAV each, all from one seed, plus `manifest.json` saying what each file kept. Hosted at https://latentft.csail.mit.edu/jupyter/ (sign in with your token), or run anywhere after `pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple`. |
-| 3 · play them from Max | `max/latentft-crossfader/` | Load the bulk folder into buffers and sweep across the files with one slider (equal-power crossfade between neighbours, all files in sync). Put the number from part 1 on the slider. **Work in progress**: the patch works but its layout is being redone. |
+## 1 · A sensor into Max — `1-sensor-into-max/`
+Sabrina's MUGIC example. The MUGIC sensor (an IMU) sends its readings as OSC over UDP, port 4000.
+- `MUGIC_SETUP.pdf`: setting the sensor up.
+- `mugic_receive.maxpat`: receives the data and rebroadcasts it inside Max; open it first and leave it open.
+- `mugic_examples.maxpat`: tilt moves a slider; tilt changes a pitch.
+- `mugic_capture.py`: prints the live readings, or records them to CSV (`uv run mugic_capture.py take1.csv`).
 
-References: `docs/API.md` (the wire format, for SuperCollider, Max, curl), `docs/CLIENT.md` (the Python client and the
-pictures, with recipes). Listening studies made with the same tools: https://latentft.csail.mit.edu/studies/.
-Running the model on your own GPU (MIT Engaging): `engaging/`.
+The outcome of part 1 is a number between 0 and 1 that follows your movement.
+
+## 2 · Render a slew of files in Python — `2-render-in-python/`
+- `notebook/LatentFT_lab.ipynb`: the lab notebook. The rate axis, masks bin by bin, blends, the latent itself, and
+  in **section 8** a bulk render: a grid of masks, one WAV each, all from one seed so they line up, plus a
+  `manifest.json` saying what each file kept. Run it hosted at https://latentft.csail.mit.edu/jupyter/ (sign in with
+  your token; everything is installed), or anywhere with
+
+      pip install "latentft-lab[viz]" --extra-index-url https://latentft.csail.mit.edu/pip/simple
+
+- `python/`: that package's source (`pip install ./python` also works).
+- `docs/CLIENT.md`: the Python client and the pictures, function by function, with recipes.
+  `docs/API.md`: the wire format, for SuperCollider, Max, curl, or your own client.
+- `own-gpu-engaging/`: running the model yourself on MIT's Engaging cluster (needs the weights: see `WEIGHTS.md`).
+
+The outcome of part 2 is a folder of same-length WAVs and a manifest.
+
+## 3 · Play them in Max — `3-play-in-max/`
+`latentft_crossfader.maxpat` loads the folder from part 2 into buffers; every file plays in sync, and one slider
+glides across them with an equal-power crossfade between neighbours. Put the number from part 1 on the slider, and
+the mapping is yours. **Work in progress**: it plays, but its layout is being redone. `build_crossfader.py`
+generates the patch (do not edit the .maxpat by hand); `README.md` explains the math.
+
+## Also
+Listening studies made with these tools, each example with the Python that made it: https://latentft.csail.mit.edu/studies/
 
 LatentFT is Wang & Huang, *Latent Fourier Transform*, ICLR 2026. The weights are Mason Wang's, shared with permission
 for MIT teaching and research; they are not in this repo and must not be redistributed.
 
-## For maintainers
-
-The model code, the hub worker and the listening studies live in `HAI-Res/latentft-post-training`; `./sync.sh` copies
-the student-facing files from there (set `MODEL_REPO` if it is not a sibling directory). The Python package in
-`python/` is the same `latentft-lab` the site serves; `pip install ./python` installs it from here.
+### For maintainers
+Model code, hub worker and studies live in `HAI-Res/latentft-post-training`; `./sync.sh` copies the shared files
+from there (set `MODEL_REPO` if it is not a sibling directory).
