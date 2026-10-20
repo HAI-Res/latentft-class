@@ -1,5 +1,6 @@
 """Render a whole sweep as a job: many files, unattended, resumable. Tutorial part 2, the "slew of files" at scale.
 
+    latentft-sweep --out my_sweep        # no file: Bob Dylan's The Man in Me from 2:00, fetched from the class site
     latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep \\
         --centres 0.4 16 24 --octaves 2 --kind band --model stereo --stereo-mode mid
 
@@ -34,10 +35,45 @@ from latentft_client import SR, LatentFT, keep  # noqa: E402
 from latentft_viz import soft_octave, xfade_sweep  # noqa: E402
 
 
+SITE = "https://latentft.csail.mit.edu"
+
+
+def class_tracks(hub: str | None = None) -> list[dict]:
+    import urllib.request
+    base = (hub if hub and hub.startswith("https://") else SITE).rstrip("/")
+    with urllib.request.urlopen(f"{base}/loops/tracks.json", timeout=60) as r:
+        items = json.loads(r.read())
+    items = items.get("tracks", []) if isinstance(items, dict) else items   # {sr, note, tracks: [...]}
+    return [t for t in items if t.get("group") == "song"] or items
+
+
+def fetch_track(track_id: str, hub: str | None = None) -> str:
+    """Download a class track once into ~/.cache/latentft/tracks and return its path."""
+    import urllib.request
+    base = (hub if hub and hub.startswith("https://") else SITE).rstrip("/")
+    with urllib.request.urlopen(f"{base}/loops/tracks.json", timeout=60) as r:
+        items = json.loads(r.read())
+    items = items.get("tracks", []) if isinstance(items, dict) else items   # {sr, note, tracks: [...]}
+    t = next((x for x in items if x.get("id") == track_id), None)
+    if t is None:
+        sys.exit(f"no class track {track_id!r}; latentft-sweep --list-tracks shows them")
+    cache = Path.home() / ".cache" / "latentft" / "tracks"; cache.mkdir(parents=True, exist_ok=True)
+    dst = cache / Path(t["file"]).name
+    if not dst.is_file():
+        print(f"downloading {t['title']} ({t['credit']}) ...", flush=True)
+        urllib.request.urlretrieve(f"{base}/loops/{t['file']}", dst)
+    return str(dst)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
-    ap.add_argument("audio")
-    ap.add_argument("--start", type=float, default=0.0, help="where the selection starts in the file, s")
+    ap.add_argument("audio", nargs="?", default=None,
+                    help="your audio file (WAV/FLAC/AIFF/OGG/MP3). Leave it out to use a class track (--track)")
+    ap.add_argument("--track", default="dylan-man-in-me",
+                    help="a class track from the site, used when no audio file is given (default: dylan-man-in-me, "
+                         "Bob Dylan's The Man in Me; --list-tracks shows them all)")
+    ap.add_argument("--list-tracks", action="store_true", help="list the class tracks and exit")
+    ap.add_argument("--start", type=float, default=None, help="where the selection starts, s (default 0; 120 for the default track)")
     ap.add_argument("--seconds", type=float, default=30.0, help="selection length, 5.944..30")
     ap.add_argument("--out", required=True)
     ap.add_argument("--centres", nargs=3, type=float, default=[0.4, 16.0, 16], metavar=("LO_HZ", "HI_HZ", "K"))
@@ -52,6 +88,17 @@ def main():
     ap.add_argument("--hub", default=None, help="another service, e.g. http://127.0.0.1:8765 for your own latentft_server.py")
     args = ap.parse_args()
 
+    if args.list_tracks:
+        for t in class_tracks(args.hub):
+            print(f"{t['id']:<28} {t['seconds']:6.0f} s  {t['title']} — {t['credit']}")
+        return
+    if args.audio is None:
+        args.audio = fetch_track(args.track, args.hub)
+        if args.start is None:
+            args.start = 120.0 if args.track == "dylan-man-in-me" else 0.0
+        print(f"no audio file given: using the class track {args.track} ({args.audio}), from {args.start:g} s", flush=True)
+    if args.start is None:
+        args.start = 0.0
     out = Path(args.out).expanduser(); out.mkdir(parents=True, exist_ok=True)
     if not Path(args.audio).expanduser().is_file():
         sys.exit(f"no such audio file: {args.audio}  (give the path to a WAV/FLAC/AIFF you have, e.g. ~/Music/song.wav)")

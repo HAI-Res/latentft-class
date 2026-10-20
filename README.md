@@ -23,9 +23,10 @@ The outcome of part 1 is a number between 0 and 1 that follows your movement.
 - **A sweep as a job**: the package installs `latentft-sweep`, which renders a whole sweep in one command, resumably
   (one file per zone centre, any number, several widths or seeds, a manifest, optional glide pieces):
 
-      latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
+      latentft-sweep --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
 
-  Use your own audio file's path. It prints its progress as it goes; if it stops, run the same command again and
+  With no audio file it uses Bob Dylan's *The Man in Me* from 2:00, fetched from the class site; put your own file's
+  path first to use that instead (`--start` says where to begin). It prints its progress as it goes; if it stops, run the same command again and
   it picks up where it left off.
 
 - `python/`: that package's source (`pip install ./python` also works).
