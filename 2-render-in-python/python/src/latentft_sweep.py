@@ -3,8 +3,7 @@
     latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep \\
         --centres 0.4 16 24 --octaves 2 --kind band --model stereo --stereo-mode mid
 
-    nohup latentft-sweep ... > sweep.log 2>&1 &          # leave it running; re-run the same command to resume
-    (latentft-sweep is installed by the latentft-lab package; `python latentft_sweep.py` is the same thing)
+    (installed by the latentft-lab package; run the same command again to resume an interrupted sweep)
 
 What it does: one render per zone centre (log-spaced from lo to hi, K of them), every render from one seed so the
 files line up, written as WAV into --out with a manifest.json (index, file, centre, octaves, what was kept in bins and

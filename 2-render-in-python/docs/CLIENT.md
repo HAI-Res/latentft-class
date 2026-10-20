@@ -409,8 +409,8 @@ notebook's file browser (right-click the zip).
 latentft-sweep ~/Music/my_song.wav --start 120 --seconds 30 --out my_sweep --centres 0.4 16 24 --octaves 2 --kind band --glides
 ```
 
-To leave it running in the background, put `nohup` in front and `> sweep.log 2>&1 &` at the end of the same command;
-running the same command again resumes it.
+It prints its progress as it goes. If it stops (you close the terminal, the network drops), run the same command
+again: it picks up where it left off.
 
 Installed with the package. One render per zone centre (K log-spaced centres from LO to HI Hz), `--widths 1 2 3` and
 `--seeds 0 1 2` for more axes, `--kind notch` to erase instead of keep, `--stereo-mode mid|lr`, `--model`. Writes the
